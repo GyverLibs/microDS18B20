@@ -14,13 +14,17 @@ uint8_t oneWire_read(uint8_t pin);
 bool oneWire_reset(uint8_t pin) { 
     pinMode(pin, 1);
     delayMicroseconds(520);
+    #ifdef AVR
     uint8_t oldSreg = SREG;
     cli();
+    #endif
     pinMode(pin, 0);
     delayMicroseconds(2);
     for (uint8_t c = 80; c; c--) {
         if (!digitalRead(pin)) {
+            #ifdef AVR
             SREG = oldSreg;
+            #endif
             for (uint8_t i = 200;  !digitalRead(pin) and i; i--) {
                 delayMicroseconds(1);
             }
@@ -28,7 +32,9 @@ bool oneWire_reset(uint8_t pin) {
         }
         delayMicroseconds(1);
     }
+    #ifdef AVR
     SREG = oldSreg;
+    #endif
     return true;
 }
 
@@ -37,8 +43,10 @@ bool oneWire_reset(uint8_t pin) {
 /* max time without interrupts ~70us*/
 void oneWire_write(uint8_t data, uint8_t pin) {
     for (uint8_t p = 8; p; p--) {
+        #ifdef AVR
         uint8_t oldSreg = SREG;
         cli();
+        #endif
         pinMode(pin, 1);
         if (data & 1) {
             delayMicroseconds(5);
@@ -49,7 +57,9 @@ void oneWire_write(uint8_t data, uint8_t pin) {
             pinMode(pin, 0);
             delayMicroseconds(5);
         }
+        #ifdef AVR
         SREG = oldSreg;
+        #endif
         data >>= 1;
     }
 }
@@ -60,15 +70,19 @@ uint8_t oneWire_read(uint8_t pin) {
     uint8_t data = 0;
     for (uint8_t p = 8; p; p--) {
         data >>= 1;
+        #ifdef AVR
         uint8_t oldSreg = SREG;
         cli();
+        #endif
         pinMode(pin, 1);
         delayMicroseconds(2);
         pinMode(pin, 0);
         delayMicroseconds(8);
         if (digitalRead(pin)) data |= 1 << 7;
         delayMicroseconds(60);
+        #ifdef AVR
         SREG = oldSreg;
+        #endif
     }
     return data;
 }
