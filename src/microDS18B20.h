@@ -17,8 +17,8 @@
     MIT License
 
     Версии:
-    v3.0
-    - Библиотека переехала на шаблон! Старые примеры НЕСОВМЕСТИМЫ. Оптимизация, новые трюки.
+    v3.0 - Библиотека переехала на шаблон! Старые примеры НЕСОВМЕСТИМЫ. Оптимизация, новые трюки.
+    v3.1 - добавлена возможность смены адреса на лету
 */
 
 #ifndef microDS18B20_h
@@ -121,6 +121,9 @@ static void _ds_crc8_upd(uint8_t &crc, uint8_t data) {  // Процедура о
 }
 #endif
 
+static uint8_t _empDsAddr[1] = {1};
+#define DS_ADDR_MODE _empDsAddr
+
 int DS_rawToInt(uint16_t data) {
     return data / 16;
 }
@@ -132,7 +135,7 @@ float DS_rawToFloat(uint16_t data) {
 template <uint8_t DS_PIN, uint8_t *DS_ADDR = nullptr>
 class MicroDS18B20 {
 public:
-    MicroDS18B20() {
+    MicroDS18B20(uint8_t * addr = nullptr) {
         pinMode(DS_PIN, INPUT);
         digitalWrite(DS_PIN, LOW);
     }
@@ -145,6 +148,11 @@ public:
         oneWire_write(0xFF, DS_PIN);                    // Максимум в верхний регистр тревоги
         oneWire_write(0x00, DS_PIN);                    // Минимум в верхний регистр тревоги
         oneWire_write(((constrain(resolution, 9, 12) - 9) << 5) | 0x1F, DS_PIN); // Запись конфигурации разрешения
+    }
+    
+    // установить адрес
+    void setAddress(uint8_t *addr) {
+        _addr = addr;
     }
     
     // Прочитать уникальный адрес термометра в массив
@@ -210,10 +218,12 @@ private:
         if (DS_ADDR) {                        		// Адрес определен?
             oneWire_write(0x55, DS_PIN);            // Говорим термометрам слушать адрес
             for (uint8_t i = 0; i < 8; i++) {       // Отправляем 8 байт уникального адреса
-                oneWire_write(DS_ADDR[i], DS_PIN);  // Из массива который нам указал пользователь
+                oneWire_write(_addr[i], DS_PIN);  // Из массива который нам указал пользователь
             }
         } else oneWire_write(0xCC, DS_PIN);         // Адреса нет - пропускаем адресацию на линии
     }
+    
+    uint8_t *_addr = DS_ADDR;
 };
 
 #endif

@@ -13,6 +13,7 @@ microDS18B20	KEYWORD1
 #######################################
 setResolution	KEYWORD2
 readAddress	KEYWORD2
+setAddress	KEYWORD2
 requestTemp	KEYWORD2
 getTemp	KEYWORD2
 getRaw	KEYWORD2
@@ -26,3 +27,4 @@ DS_rawToFloat	KEYWORD2
 DS_TEMP_TYPE	LITERAL1
 DS_CHECK_CRC	LITERAL1
 DS_CRC_USE_TABLE	LITERAL1
+DS_ADDR_MODE	LITERAL1
