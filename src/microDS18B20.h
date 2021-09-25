@@ -20,10 +20,11 @@
     v3.0 - Библиотека переехала на шаблон! Старые примеры НЕСОВМЕСТИМЫ. Оптимизация, новые трюки.
     v3.1 - добавлена возможность смены адреса на лету
     v3.1.1 - microOneWire разбит на .h и .cpp
+    v3.2 - исправлены отрицательные температуры
 */
 
-#ifndef microDS18B20_h
-#define microDS18B20_h
+#ifndef _microDS18B20_h
+#define _microDS18B20_h
 #include <Arduino.h>
 #include "microOneWire.h"
 
@@ -184,7 +185,7 @@ public:
     }
     
     // Прочитать "сырое" значение температуры
-    uint16_t getRaw(void) {
+    int16_t getRaw(void) {
         uint8_t _calculated_crc = 0;                // Переменная для хранения CRC
         if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
         addressRoutine();                   		// Процедура адресации
@@ -201,11 +202,11 @@ public:
         data[0] = oneWire_read(DS_PIN);             // Прочитать младший байт температуры
         data[1] = oneWire_read(DS_PIN);             // Прочитать старший байт температуры
 #endif
-        return (uint16_t)(data[1] << 8) | data[0];  // Вернуть "сырое" значение
+        return (int16_t)(data[1] << 8) | data[0];   // Вернуть "сырое" значение
     }
 
     // Преобразовать "сырое" значение в температуру
-    DS_TEMP_TYPE calcRaw(uint16_t data) {
+    DS_TEMP_TYPE calcRaw(int16_t data) {
         return ((DS_TEMP_TYPE)data / 16);           // Рассчитать значение температуры
     }
     
