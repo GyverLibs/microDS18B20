@@ -21,12 +21,14 @@
     v3.1 - добавлена возможность смены адреса на лету
     v3.1.1 - microOneWire разбит на .h и .cpp
     v3.2 - исправлены отрицательные температуры
+    v3.3 - разбил на файлы
 */
 
 #ifndef _microDS18B20_h
 #define _microDS18B20_h
 #include <Arduino.h>
 #include "microOneWire.h"
+#include "DS_raw.h"
 
 #ifndef DS_TEMP_TYPE
 #define DS_TEMP_TYPE float  	  // float/int - тип данных для рассчета температуры float / int - (экономит flash, выполняется быстрее)
@@ -42,7 +44,7 @@
 
 /*
 Время исполнения функций для работы с датчиком (частота ядра - 16 МГц):
-_________________________________________________________________________________
+ _________________________________________________________________________________
 | Датчик без адресации (один на линии) | Датчик с адресацией (несколько на линии) |
 |______________________________________|__________________________________________|
 | .setResolution(...) ~ 3591.125 мкс   | .setResolution(...) ~ 8276.0625 мкс 	  |
@@ -62,10 +64,7 @@ ________________________________________________________________________________
 |______________________________________|__________________________________________|
 */
 
-int DS_rawToInt(uint16_t data);         // преобразовать raw данные в температуру int
-float DS_rawToFloat(uint16_t data);     // преобразовать raw данные в температуру float
-static void _ds_crc8_upd(uint8_t &crc, uint8_t data);
-
+// ====================== CRC TABLE ======================
 #if (DS_CRC_USE_TABLE == true)
 static const uint8_t PROGMEM _ds_crc8_table[] = {
     0x00, 0x5e, 0xbc, 0xe2, 0x61, 0x3f, 0xdd, 0x83, 0xc2, 0x9c, 0x7e, 0x20, 0xa3, 0xfd, 0x1f, 0x41,
@@ -87,53 +86,11 @@ static const uint8_t PROGMEM _ds_crc8_table[] = {
 };
 #endif
 
-// ===============================================================================================
-#if (DS_CHECK_CRC == true)
-static void _ds_crc8_upd(uint8_t &crc, uint8_t data) {  // Процедура обновления CRC
-#if (DS_CRC_USE_TABLE == true)                          // Используем таблицу?
-    crc = pgm_read_byte(&_ds_crc8_table[crc ^ data]);   // Тогда берем готовое значение
-#else                                                   // По - дедовски?
-    #if defined (__AVR__)
-    // резкий алгоритм для AVR
-    uint8_t counter;
-    uint8_t buffer;
-    asm volatile (
-    "EOR %[crc_out], %[data_in] \n\t"
-    "LDI %[counter], 8          \n\t"
-    "LDI %[buffer], 0x8C        \n\t"
-    "_loop_start_%=:            \n\t"
-    "LSR %[crc_out]             \n\t"
-    "BRCC _loop_end_%=          \n\t"
-    "EOR %[crc_out], %[buffer]  \n\t"
-    "_loop_end_%=:              \n\t"
-    "DEC %[counter]             \n\t"
-    "BRNE _loop_start_%="
-    : [crc_out]"=r" (crc), [counter]"=d" (counter), [buffer]"=d" (buffer)
-    : [crc_in]"0" (crc), [data_in]"r" (data)
-    );
-#else
-    // обычный для всех остальных
-    uint8_t i = 8;
-    while (i--) {
-        crc = ((crc ^ data) & 1) ? (crc >> 1) ^ 0x8C : (crc >> 1);
-        data >>= 1;
-    }
-#endif
-#endif
-}
-#endif
 
 static uint8_t _empDsAddr[1] = {1};
 #define DS_ADDR_MODE _empDsAddr
 
-int DS_rawToInt(uint16_t data) {
-    return data / 16;
-}
-float DS_rawToFloat(uint16_t data) {
-    return data / 16.0;
-}
-
-// ============================================================================
+// ====================== CLASS ======================
 template <uint8_t DS_PIN, uint8_t *DS_ADDR = nullptr>
 class MicroDS18B20 {
 public:
@@ -168,24 +125,24 @@ public:
             _temp_address[i] = oneWire_read(DS_PIN);    // Записать байты во временный массив
             _ds_crc8_upd(_calculated_crc, _temp_address[i]);  // Обновить значение CRC8
         }
-        if (_calculated_crc) return;                // Если CRC не сошелся - данные в помойку
-        memcpy(addressArray, _temp_address, 8);     // Если сошелся - переписать массив в основной
-#else                                               // Если пропуск проверки CRC
-        for (uint8_t i = 0; i < 8; i++) {           // Прочитать 8 байт
-            addressArray[i] = oneWire_read(DS_PIN); // Поместить в пользовательский массив
+        if (_calculated_crc) return;                    // Если CRC не сошелся - данные в помойку
+        memcpy(addressArray, _temp_address, 8);         // Если сошелся - переписать массив в основной
+#else                                                   // Если пропуск проверки CRC
+        for (uint8_t i = 0; i < 8; i++) {               // Прочитать 8 байт
+            addressArray[i] = oneWire_read(DS_PIN);     // Поместить в пользовательский массив
         }
 #endif
     }
     
     // Запрос температуры
-    void requestTemp(void) {
+    void requestTemp() {
         if (oneWire_reset(DS_PIN)) return;          // Проверка присутствия
         addressRoutine();                           // Процедура адресации
         oneWire_write(0x44, DS_PIN);                // Запросить преобразование
     }
     
     // Прочитать "сырое" значение температуры
-    int16_t getRaw(void) {
+    int16_t getRaw() {
         uint8_t _calculated_crc = 0;                // Переменная для хранения CRC
         if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
         addressRoutine();                   		// Процедура адресации
@@ -211,21 +168,55 @@ public:
     }
     
     // Чтение температуры
-    DS_TEMP_TYPE getTemp(void) {
+    DS_TEMP_TYPE getTemp() {
         return calcRaw((DS_TEMP_TYPE)getRaw());
     }
 
 private:
-    void addressRoutine(void) {                   	// Процедура адресации
+    uint8_t *_addr = DS_ADDR;
+    
+    void addressRoutine() {                   	    // Процедура адресации
         if (DS_ADDR) {                        		// Адрес определен?
             oneWire_write(0x55, DS_PIN);            // Говорим термометрам слушать адрес
             for (uint8_t i = 0; i < 8; i++) {       // Отправляем 8 байт уникального адреса
-                oneWire_write(_addr[i], DS_PIN);  // Из массива который нам указал пользователь
+                oneWire_write(_addr[i], DS_PIN);    // Из массива который нам указал пользователь
             }
         } else oneWire_write(0xCC, DS_PIN);         // Адреса нет - пропускаем адресацию на линии
     }
-    
-    uint8_t *_addr = DS_ADDR;
-};
 
+    #if (DS_CHECK_CRC == true)
+    void _ds_crc8_upd(uint8_t &crc, uint8_t data) {
+#if (DS_CRC_USE_TABLE == true)                          // Используем таблицу?
+        crc = pgm_read_byte(&_ds_crc8_table[crc ^ data]);   // Тогда берем готовое значение
+#else                                                   // По - дедовски?
+#ifdef __AVR__
+        // резкий алгоритм для AVR
+        uint8_t counter;
+        uint8_t buffer;
+        asm volatile (
+        "EOR %[crc_out], %[data_in] \n\t"
+        "LDI %[counter], 8          \n\t"
+        "LDI %[buffer], 0x8C        \n\t"
+        "_loop_start_%=:            \n\t"
+        "LSR %[crc_out]             \n\t"
+        "BRCC _loop_end_%=          \n\t"
+        "EOR %[crc_out], %[buffer]  \n\t"
+        "_loop_end_%=:              \n\t"
+        "DEC %[counter]             \n\t"
+        "BRNE _loop_start_%="
+        : [crc_out]"=r" (crc), [counter]"=d" (counter), [buffer]"=d" (buffer)
+        : [crc_in]"0" (crc), [data_in]"r" (data)
+        );
+#else
+        // обычный для всех остальных
+        uint8_t i = 8;
+        while (i--) {
+            crc = ((crc ^ data) & 1) ? (crc >> 1) ^ 0x8C : (crc >> 1);
+            data >>= 1;
+        }
+#endif
+#endif
+    }
+#endif
+};
 #endif
