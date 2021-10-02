@@ -13,6 +13,7 @@
 
 ### Совместимость
 Совместима со всеми Arduino платформами (используются Arduino-функции)
+- Не работает на Digispark, какой то конфликт с компилятором. Используй ядро [ATTInyCore Universal](https://github.com/SpenceKonde/ATTinyCore) с настройкой ATtiny85 + Micronucleous (Digispark) вместо стандартного Digi-ядра
 
 ## Содержание
 - [Установка](#install)
