@@ -18,6 +18,7 @@ requestTemp	KEYWORD2
 getTemp	KEYWORD2
 getRaw	KEYWORD2
 calcRaw	KEYWORD2
+online	KEYWORD2
 DS_rawToInt	KEYWORD2
 DS_rawToFloat	KEYWORD2
 

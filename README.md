@@ -49,11 +49,12 @@ MicroDS18B20<uint8_t pin, DS_ADDR_MODE>;        // говорим, что дат
 ```cpp
 // ============= МЕТОДЫ КЛАССА =============
 void setAddress(uint8_t *addr);             // установить (сменить) адрес
-void setResolution(uint8_t resolution);     // Установить разрешение термометра 9-12 бит
-void readAddress(uint8_t *addressArray);    // Прочитать уникальный адрес термометра в массив
-void requestTemp(void);                     // Запросить новое преобразование температуры
-int getRaw(void)                            // Прочитать "сырое" значение температуры
-[int/float] getTemp(void);                  // Прочитать значение температуры
+bool setResolution(uint8_t resolution);     // Установить разрешение термометра 9-12 бит. Вернёт true, если успешно (датчик онлайн)
+bool readAddress(uint8_t *addressArray);    // Прочитать уникальный адрес термометра в массив. Вернёт true, если успешно (датчик онлайн)
+bool requestTemp();                         // Запросить новое преобразование температуры. Вернёт true, если успешно (датчик онлайн)
+int getRaw();                               // Прочитать "сырое" значение температуры
+bool online();                              // проверить связь с датчиком (true - датчик онлайн)
+[int/float] getTemp();                      // Прочитать значение температуры. Если ровно 0 - возможно датчик отключен. Проверь через online()!
 [int/float] calcRaw(int data);              // Преобразовать "сырое" значение в температуру
 
 // =========== ФУНКЦИИ ВНЕ КЛАССА ===========
@@ -63,7 +64,7 @@ float DS_rawToFloat(int data);              // преобразовать raw д
 // ============ ДЕФАЙНЫ НАСТРОЕК ============
 // прописывать перед подключением библиотеки
 #define DS_TEMP_TYPE [float / int]          // Тип данных для температуры (точность / экономия flash) (По умолч. float)
-#define DS_CHECK_CRC [true / false]         // Проверка подлинности принятых данных (По умолч. true)
+#define DS_CHECK_CRC [true / false]         // Проверка подлинности принятых данных. При отключении будет выдавать некорректное значение при сбое передачи данных (По умолч. true)
 #define DS_CRC_USE_TABLE [true / false]     // Использовать таблицу для CRC. Быстрее, но +256 байт flash (<1мкс VS ~6мкс) (По умолч. false)
 
 // ================== ИНФО ==================
@@ -127,8 +128,14 @@ void loop() {
   // вывод
   Serial.print("t: ");
   Serial.print(sensor1.getTemp());
-  Serial.print(", ");
-  Serial.println(sensor2.getTemp());
+  
+  // можно проверить наличие датчика на линии
+  if (sensor2.online()) {
+    Serial.print(", ");
+    Serial.println(sensor2.getTemp());
+  } else {
+    Serial.println(", Sensor 2 offline");
+  }
 }
 ```
 
@@ -179,17 +186,20 @@ void setup() {
 }
 
 void loop() {
-  sensor.readAddress(addressBuf);
-
-  // выводим в порт
-  Serial.print("Address: {");
-  for (uint8_t i = 0; i < 8; i++) {
-    Serial.print("0x");
-    Serial.print(addressBuf[i], HEX);
-    if (i < 7) Serial.print(", ");
+  // Читаем адрес термометра в массив
+  if (sensor.readAddress(address)) {  // если успешно
+    // выводим в порт
+    Serial.print("Address: {");
+    for (uint8_t i = 0; i < 8; i++) {
+      Serial.print("0x");
+      Serial.print(address[i], HEX);  // Выводим адрес для копирования
+      if (i < 7) Serial.print(", ");
+    }
+    Serial.println("};");
+    
+  } else {                            // датчик не подключен
+    Serial.println("Not connected");
   }
-  Serial.println("};");
-
   delay(1000);
 }
 ```
@@ -255,6 +265,7 @@ void loop() {
 - v3.1.1 - microOneWire разбит на .h и .cpp
 - v3.2 - исправлены отрицательные температуры
 - v3.3 - разбил на файлы
+- v3.4 - добавлена проверка онлайна датчика и буфер, при ошибке чтения возвращается последнее прочитанное значение
 
 <a id="feedback"></a>
 ## Баги и обратная связь

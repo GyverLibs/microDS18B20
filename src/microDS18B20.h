@@ -22,6 +22,7 @@
     v3.1.1 - microOneWire разбит на .h и .cpp
     v3.2 - исправлены отрицательные температуры
     v3.3 - разбил на файлы
+    v3.4 - добавлена проверка онлайна датчика и буфер, при ошибке чтения возвращается последнее прочитанное значение
 */
 
 #ifndef _microDS18B20_h
@@ -44,7 +45,7 @@
 
 /*
 Время исполнения функций для работы с датчиком (частота ядра - 16 МГц):
- _________________________________________________________________________________
+_________________________________________________________________________________
 | Датчик без адресации (один на линии) | Датчик с адресацией (несколько на линии) |
 |______________________________________|__________________________________________|
 | .setResolution(...) ~ 3591.125 мкс   | .setResolution(...) ~ 8276.0625 мкс 	  |
@@ -100,13 +101,14 @@ public:
     }
 
     // Установить разрешение термометра 9-12 бит
-    void setResolution(uint8_t resolution) {
-        if (oneWire_reset(DS_PIN)) return;              // Сброс и проверка присутствия
-        addressRoutine();                               // Процедура адресации
-        oneWire_write(0x4E, DS_PIN);                    // Запись RAM
-        oneWire_write(0xFF, DS_PIN);                    // Максимум в верхний регистр тревоги
-        oneWire_write(0x00, DS_PIN);                    // Минимум в верхний регистр тревоги
-        oneWire_write(((constrain(resolution, 9, 12) - 9) << 5) | 0x1F, DS_PIN); // Запись конфигурации разрешения
+    bool setResolution(uint8_t res) {
+        if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
+        addressRoutine();                           // Процедура адресации
+        oneWire_write(0x4E, DS_PIN);                // Запись RAM
+        oneWire_write(0xFF, DS_PIN);                // Максимум в верхний регистр тревоги
+        oneWire_write(0x00, DS_PIN);                // Минимум в верхний регистр тревоги
+        oneWire_write(((constrain(res, 9, 12) - 9) << 5) | 0x1F, DS_PIN); // Запись конфигурации разрешения
+        return 1;
     }
     
     // установить адрес
@@ -115,51 +117,54 @@ public:
     }
     
     // Прочитать уникальный адрес термометра в массив
-    void readAddress(uint8_t *addressArray) {
-        if (DS_ADDR or oneWire_reset(DS_PIN)) return;   // Проверка присутствия
-        oneWire_write(0x33, DS_PIN);                    // Запрос адреса
-#if (DS_CHECK_CRC == true)                              // Если требуется проверка подлинности
-        uint8_t _calculated_crc = 0;                    // Переменная для CRC8
-        uint8_t _temp_address[8];                       // Временный массив для адреса
-        for (uint8_t i = 0; i < 8; i++) {               // Прочитать 8 байт адреса
-            _temp_address[i] = oneWire_read(DS_PIN);    // Записать байты во временный массив
-            _ds_crc8_upd(_calculated_crc, _temp_address[i]);  // Обновить значение CRC8
+    bool readAddress(uint8_t *addr) {
+        if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
+        oneWire_write(0x33, DS_PIN);                // Запрос адреса
+#if (DS_CHECK_CRC == true)                          // Если требуется проверка подлинности
+        uint8_t crc = 0;                            // Переменная для CRC8
+        uint8_t temp[8];                            // Временный массив для адреса
+        for (uint8_t i = 0; i < 8; i++) {           // Прочитать 8 байт адреса
+            temp[i] = oneWire_read(DS_PIN);         // Записать байты во временный массив
+            _ds_crc8_upd(crc, temp[i]);             // Обновить значение CRC8
         }
-        if (_calculated_crc) return;                    // Если CRC не сошелся - данные в помойку
-        memcpy(addressArray, _temp_address, 8);         // Если сошелся - переписать массив в основной
-#else                                                   // Если пропуск проверки CRC
-        for (uint8_t i = 0; i < 8; i++) {               // Прочитать 8 байт
-            addressArray[i] = oneWire_read(DS_PIN);     // Поместить в пользовательский массив
+        if (crc) return 0;                          // CRC не сошелся - ошибка
+        memcpy(addr, temp, 8);                      // Если сошелся - переписать массив в основной
+#else                                               // Если пропуск проверки CRC
+        for (uint8_t i = 0; i < 8; i++) {           // Прочитать 8 байт
+            addr[i] = oneWire_read(DS_PIN);         // Поместить в пользовательский массив
         }
 #endif
+        return 1;
     }
     
     // Запрос температуры
-    void requestTemp() {
-        if (oneWire_reset(DS_PIN)) return;          // Проверка присутствия
+    bool requestTemp() {
+        if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
         addressRoutine();                           // Процедура адресации
         oneWire_write(0x44, DS_PIN);                // Запросить преобразование
+        return 1;
     }
     
     // Прочитать "сырое" значение температуры
     int16_t getRaw() {
-        uint8_t _calculated_crc = 0;                // Переменная для хранения CRC
-        if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
+        if (oneWire_reset(DS_PIN)) return buf;      // если датчик оффлайн
         addressRoutine();                   		// Процедура адресации
         oneWire_write(0xBE, DS_PIN);                // Запросить температуру
 #if (DS_CHECK_CRC == true)                          // Если требуется проверка подлинности
+        uint8_t crc = 0;                            // Переменная для хранения CRC
         uint8_t data[9];                            // Временный массив для данных (9 байт)
         for (uint8_t i = 0; i < 9; i++) {           // Считать RAM
             data[i] = oneWire_read(DS_PIN);         // Прочитать данные
-            _ds_crc8_upd(_calculated_crc, data[i]); // Обновить значение CRC8
+            _ds_crc8_upd(crc, data[i]);             // Обновить значение CRC8
         }
-        if (_calculated_crc) return 0;              // Если CRC не сошелся - данные в помойку
+        if (!crc) buf = (int16_t)(data[1] << 8) | data[0];  // crc сошёлся - обновляем
 #else                                               // Если пропуск проверки CRC
         uint8_t data[2];                            // Временный массив для данных (2 байта)
         data[0] = oneWire_read(DS_PIN);             // Прочитать младший байт температуры
         data[1] = oneWire_read(DS_PIN);             // Прочитать старший байт температуры
+        buf = (int16_t)(data[1] << 8) | data[0];
 #endif
-        return (int16_t)(data[1] << 8) | data[0];   // Вернуть "сырое" значение
+        return buf;
     }
 
     // Преобразовать "сырое" значение в температуру
@@ -171,9 +176,15 @@ public:
     DS_TEMP_TYPE getTemp() {
         return calcRaw((DS_TEMP_TYPE)getRaw());
     }
+    
+    // проверить связь с датчиком (true - датчик на линии)
+    bool online() {
+        return !oneWire_reset(DS_PIN);
+    }
 
 private:
     uint8_t *_addr = DS_ADDR;
+    int16_t buf = 0;
     
     void addressRoutine() {                   	    // Процедура адресации
         if (DS_ADDR) {                        		// Адрес определен?

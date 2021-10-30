@@ -36,14 +36,12 @@ void loop() {
     for (int i = 0; i < DS_SENSOR_AMOUNT; i++) {
       Serial.print(sensor[i].getTemp());
       Serial.print(',');
-      //delay(5); // возможно понадобится дилей, у меня работает без него
     }
     Serial.println();
 
     // запрашиваем новые
     for (int i = 0; i < DS_SENSOR_AMOUNT; i++) {
       sensor[i].requestTemp();
-      //delay(5); // возможно понадобится дилей, у меня работает без него
     }
   }
 }
