@@ -15,17 +15,18 @@ setResolution	KEYWORD2
 readAddress	KEYWORD2
 setAddress	KEYWORD2
 requestTemp	KEYWORD2
+readTemp	KEYWORD2
 getTemp	KEYWORD2
+getTempInt	KEYWORD2
 getRaw	KEYWORD2
-calcRaw	KEYWORD2
 online	KEYWORD2
+
 DS_rawToInt	KEYWORD2
 DS_rawToFloat	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
 #######################################
-DS_TEMP_TYPE	LITERAL1
 DS_CHECK_CRC	LITERAL1
 DS_CRC_USE_TABLE	LITERAL1
 DS_ADDR_MODE	LITERAL1

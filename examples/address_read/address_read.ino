@@ -1,6 +1,6 @@
 /*
    Чтение уникального адреса термометра для последующего использования
-   ВНИМАНИЕ! Устанавливать не более одного датчика на линию (пин) во избежание конфликта
+   ВНИМАНИЕ! Устанавливать не более одного датчика на линию (пин)
 */
 #include <microDS18B20.h>
 
@@ -12,19 +12,16 @@ void setup() {
 }
 
 void loop() {
-  // Читаем адрес термометра в массив
-  if (sensor.readAddress(address)) {  // если успешно
-    // выводим в порт
-    Serial.print("Address: {");
+  // читаем адрес термометра в указанный массив
+  if (sensor.readAddress(address)) {  // если успешно, выводим
+    Serial.print('{');
     for (uint8_t i = 0; i < 8; i++) {
       Serial.print("0x");
-      Serial.print(address[i], HEX);  // Выводим адрес для копирования
+      Serial.print(address[i], HEX);  // Выводим адрес
       if (i < 7) Serial.print(", ");
     }
-    Serial.println("};");
-    
-  } else {                            // датчик не подключен
-    Serial.println("Not connected");
-  }
+    Serial.println('}');
+
+  } else Serial.println("Not connected");
   delay(1000);
 }

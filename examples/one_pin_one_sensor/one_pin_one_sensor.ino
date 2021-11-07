@@ -8,7 +8,6 @@ MicroDS18B20<3> sensor2;
 
 void setup() {
   Serial.begin(9600);
-  //sensor1.setResolution(12);  // разрешение [9-12] бит. По умолч. 12
 }
 
 void loop() {
@@ -16,31 +15,19 @@ void loop() {
   sensor1.requestTemp();
   sensor2.requestTemp();
 
-  // вместо delay используй таймер на millis()
+  // вместо delay используй таймер на millis(), пример async_read
   delay(1000);
 
-  // вывод
-  Serial.print("t: ");
+  // ПЕРВЫЙ ДАТЧИК
+  Serial.print("t1: ");
+  
+  // просто выводим температуру первого датчика
   Serial.print(sensor1.getTemp());
 
-  // можно проверить наличие датчика на линии
-  if (sensor2.online()) {
-    Serial.print(", ");
-    Serial.println(sensor2.getTemp());
-  } else {
-    Serial.println(", Sensor 2 offline");
-  }
+  // ВТОРОЙ ДАТЧИК
+  Serial.print(", t2: ");
+  
+  // проверяем успешность чтения и выводим
+  if (sensor2.readTemp()) Serial.println(sensor2.getTemp());
+  else Serial.println("error");
 }
-
-/*
-  Опрос датчиков асинхронный, т.е. не блокирует выполнение кода, но
-  между requestTemp и getTemp должно пройти не менее
-
-  точность | время
-  12 бит   | 750 мс
-  11 бит   | 375 мс
-  10 бит   | 187 мс
-  9 бит    | 93 мс
-
-  Иначе датчик вернёт предыдущее значение
-*/

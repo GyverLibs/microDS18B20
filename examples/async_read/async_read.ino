@@ -16,8 +16,8 @@ void loop() {
     tmr = millis();
 
     // читаем прошлое значение
-    if (sensor.online()) Serial.println(sensor.getTemp());
-    else Serial.println("Not connected");
+    if (sensor.readTemp()) Serial.println(sensor.getTemp());
+    else Serial.println("error");
 
     // запрашиваем новое измерение
     sensor.requestTemp();

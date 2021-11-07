@@ -3,14 +3,14 @@
     Документация:
     GitHub: https://github.com/GyverLibs/microDS18B20
     Возможности:
-    - Возможность работы с несколькими датчиками на одном пине при использовании 8-байтного уникального адреса
-    - Возможность работы с одним датчиком на пине без использования адресации
+    - Работа с несколькими датчиками на одном пине (режим адресации)
+    - Работа с одним датчиком на пине (без использования адресации)
+    - Расчет температуры в целых числах и с плавающей точкой
+    - Проверка корректности полученной температуры
     - Настраиваемое разрешение преобразования
-    - Чтение сырых данных (без float) для случаев сильной экономии памяти
-    - Проверка подлинности данных "на лету", с использованием CRC8 от Dallas [#define DS_CHECK_CRC]
-    - Расчет CRC8 (~6 мкс) или чтение из таблицы (<1 мкс + 256 байт flash) [#define DS_CRC_USE_TABLE]
-    - Расчет температуры как в целых числах, так и с плавающей точкой [#define DS_TEMP_TYPE float / int]
-    - Чтение уникального адреса подключенного термометра в указанный массив типа byte
+    - Чтение сырых данных для случаев сильной экономии памяти
+    - Проверка подлинности данных "на лету", с использованием CRC8 от Dallas
+    - Расчет CRC8 (~6 мкс) или чтение из таблицы (<1 мкс + 256 байт flash)
     
     Egor 'Nich1con' Zakharov for AlexGyver, alex@alexgyver.ru
     https://alexgyver.ru/
@@ -23,6 +23,7 @@
     v3.2 - исправлены отрицательные температуры
     v3.3 - разбил на файлы
     v3.4 - добавлена проверка онлайна датчика и буфер, при ошибке чтения возвращается последнее прочитанное значение
+    v3.5 - оптимизация, повышение стабильности, проверка правильности чтения, online() работает с адресацией, добавлен метод getTempInt() и readTemp(), упразднён DS_TEMP_TYPE
 */
 
 #ifndef _microDS18B20_h
@@ -30,10 +31,6 @@
 #include <Arduino.h>
 #include "microOneWire.h"
 #include "DS_raw.h"
-
-#ifndef DS_TEMP_TYPE
-#define DS_TEMP_TYPE float  	  // float/int - тип данных для рассчета температуры float / int - (экономит flash, выполняется быстрее)
-#endif
 
 #ifndef DS_CHECK_CRC
 #define DS_CHECK_CRC true		  // true/false - проверка контрольной суммы принятых данных - надежнее, но тратит немного больше flash
@@ -87,7 +84,6 @@ static const uint8_t PROGMEM _ds_crc8_table[] = {
 };
 #endif
 
-
 static uint8_t _empDsAddr[1] = {1};
 #define DS_ADDR_MODE _empDsAddr
 
@@ -95,20 +91,19 @@ static uint8_t _empDsAddr[1] = {1};
 template <uint8_t DS_PIN, uint8_t *DS_ADDR = nullptr>
 class MicroDS18B20 {
 public:
-    MicroDS18B20(uint8_t * addr = nullptr) {
+    MicroDS18B20() {
         pinMode(DS_PIN, INPUT);
         digitalWrite(DS_PIN, LOW);
     }
 
     // Установить разрешение термометра 9-12 бит
-    bool setResolution(uint8_t res) {
-        if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
+    void setResolution(uint8_t res) {
+        if (oneWire_reset(DS_PIN)) return;          // Проверка присутствия
         addressRoutine();                           // Процедура адресации
         oneWire_write(0x4E, DS_PIN);                // Запись RAM
         oneWire_write(0xFF, DS_PIN);                // Максимум в верхний регистр тревоги
         oneWire_write(0x00, DS_PIN);                // Минимум в верхний регистр тревоги
         oneWire_write(((constrain(res, 9, 12) - 9) << 5) | 0x1F, DS_PIN); // Запись конфигурации разрешения
-        return 1;
     }
     
     // установить адрес
@@ -120,86 +115,94 @@ public:
     bool readAddress(uint8_t *addr) {
         if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
         oneWire_write(0x33, DS_PIN);                // Запрос адреса
-#if (DS_CHECK_CRC == true)                          // Если требуется проверка подлинности
-        uint8_t crc = 0;                            // Переменная для CRC8
-        uint8_t temp[8];                            // Временный массив для адреса
+        int16_t sum = 0;                            // контрольная сумма
+        crc = 0;                                    // обнуляем crc
         for (uint8_t i = 0; i < 8; i++) {           // Прочитать 8 байт адреса
-            temp[i] = oneWire_read(DS_PIN);         // Записать байты во временный массив
-            _ds_crc8_upd(crc, temp[i]);             // Обновить значение CRC8
+            addr[i] = oneWire_read(DS_PIN);         // Записать в массив
+            sum += addr[i];                         // контрольная сумма
+            _ds_crc8_upd(crc, addr[i]);             // Обновить значение CRC8
         }
-        if (crc) return 0;                          // CRC не сошелся - ошибка
-        memcpy(addr, temp, 8);                      // Если сошелся - переписать массив в основной
-#else                                               // Если пропуск проверки CRC
-        for (uint8_t i = 0; i < 8; i++) {           // Прочитать 8 байт
-            addr[i] = oneWire_read(DS_PIN);         // Поместить в пользовательский массив
-        }
-#endif
-        return 1;
+        if (crc || !sum) return 0;                  // CRC не сошелся или адрес нулевой - ошибка
+        return 1;                                   // всё ок
     }
     
     // Запрос температуры
-    bool requestTemp() {
-        if (oneWire_reset(DS_PIN)) return 0;        // Проверка присутствия
+    void requestTemp() {
+        state = 0;                                  // запрошена новая температура
+        if (oneWire_reset(DS_PIN)) return;          // Проверка присутствия
         addressRoutine();                           // Процедура адресации
         oneWire_write(0x44, DS_PIN);                // Запросить преобразование
-        return 1;
     }
     
-    // Прочитать "сырое" значение температуры
+    // получить температуру float
+    float getTemp() {
+        if (!state) readTemp();
+        return (_buf / 16.0);
+    }
+    
+    // получить температуру int
+    int16_t getTempInt() {
+        if (!state) readTemp();
+        return (_buf >> 4);
+    }
+    
+    // получить "сырое" значение температуры
     int16_t getRaw() {
-        if (oneWire_reset(DS_PIN)) return buf;      // если датчик оффлайн
+        if (!state) readTemp();
+        return _buf;
+    }
+    
+    // прочитать температуру с датчика. true если успешно
+    bool readTemp() {
+        state = 1;
+        if (oneWire_reset(DS_PIN)) return 0;        // датчик оффлайн
         addressRoutine();                   		// Процедура адресации
         oneWire_write(0xBE, DS_PIN);                // Запросить температуру
-#if (DS_CHECK_CRC == true)                          // Если требуется проверка подлинности
-        uint8_t crc = 0;                            // Переменная для хранения CRC
+        crc = 0;                                    // обнуляем crc
+        int16_t temp;                               // переменная для расчёта температуры
+        int16_t sum = 0;                            // контрольная сумма
         uint8_t data[9];                            // Временный массив для данных (9 байт)
         for (uint8_t i = 0; i < 9; i++) {           // Считать RAM
             data[i] = oneWire_read(DS_PIN);         // Прочитать данные
+            sum += data[i];
             _ds_crc8_upd(crc, data[i]);             // Обновить значение CRC8
         }
-        if (!crc) buf = (int16_t)(data[1] << 8) | data[0];  // crc сошёлся - обновляем
-#else                                               // Если пропуск проверки CRC
-        uint8_t data[2];                            // Временный массив для данных (2 байта)
-        data[0] = oneWire_read(DS_PIN);             // Прочитать младший байт температуры
-        data[1] = oneWire_read(DS_PIN);             // Прочитать старший байт температуры
-        buf = (int16_t)(data[1] << 8) | data[0];
-#endif
-        return buf;
+        temp = (int16_t)(data[1] << 8) | data[0];
+        if (temp == 0xFFFF || sum == 0 || crc) return 0;   // датчик оффлайн или данные повреждены        
+        if (temp != 0x0550) _buf = temp;            // пропускаем первое чтение (85 градусов)
+        return 1;
     }
 
-    // Преобразовать "сырое" значение в температуру
-    DS_TEMP_TYPE calcRaw(int16_t data) {
-        return ((DS_TEMP_TYPE)data / 16);           // Рассчитать значение температуры
-    }
-    
-    // Чтение температуры
-    DS_TEMP_TYPE getTemp() {
-        return calcRaw((DS_TEMP_TYPE)getRaw());
-    }
-    
-    // проверить связь с датчиком (true - датчик на линии)
+    // проверить связь с датчиком (true - датчик на линии). ЛИНИЯ ДОЛЖНА БЫТЬ ПОДТЯНУТА
     bool online() {
-        return !oneWire_reset(DS_PIN);
+        if (DS_ADDR) {
+            oneWire_reset(DS_PIN);
+            addressRoutine();
+            oneWire_write(0xBE, DS_PIN);
+            return !(oneWire_read(DS_PIN) == 0xFF && oneWire_read(DS_PIN) == 0xFF);   // вернул 0xFFFF
+        } else return !oneWire_reset(DS_PIN);
     }
 
 private:
+    uint8_t crc = 0;
+    bool state = 0;
     uint8_t *_addr = DS_ADDR;
-    int16_t buf = 0;
+    int16_t _buf = 0;
     
     void addressRoutine() {                   	    // Процедура адресации
         if (DS_ADDR) {                        		// Адрес определен?
             oneWire_write(0x55, DS_PIN);            // Говорим термометрам слушать адрес
             for (uint8_t i = 0; i < 8; i++) {       // Отправляем 8 байт уникального адреса
-                oneWire_write(_addr[i], DS_PIN);    // Из массива который нам указал пользователь
+                oneWire_write(_addr[i], DS_PIN);
             }
         } else oneWire_write(0xCC, DS_PIN);         // Адреса нет - пропускаем адресацию на линии
     }
 
-    #if (DS_CHECK_CRC == true)
     void _ds_crc8_upd(uint8_t &crc, uint8_t data) {
-#if (DS_CRC_USE_TABLE == true)                          // Используем таблицу?
+#if (DS_CHECK_CRC == true)                                  // разрешено
+#if (DS_CRC_USE_TABLE == true)                              // Используем таблицу?
         crc = pgm_read_byte(&_ds_crc8_table[crc ^ data]);   // Тогда берем готовое значение
-#else                                                   // По - дедовски?
+#else                                                       // считаем вручную
 #ifdef __AVR__
         // резкий алгоритм для AVR
         uint8_t counter;
@@ -227,7 +230,7 @@ private:
         }
 #endif
 #endif
-    }
 #endif
+    }
 };
 #endif
