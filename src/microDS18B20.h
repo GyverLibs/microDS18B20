@@ -24,6 +24,7 @@
     v3.3 - разбил на файлы
     v3.4 - добавлена проверка онлайна датчика и буфер, при ошибке чтения возвращается последнее прочитанное значение
     v3.5 - оптимизация, повышение стабильности, проверка правильности чтения, online() работает с адресацией, добавлен метод getTempInt() и readTemp(), упразднён DS_TEMP_TYPE
+    v3.6 - исправлена ошибка компиляции, добавлена поддержка GyverCore (спасибо ArtemiyKolobov)
 */
 
 #ifndef _microDS18B20_h
@@ -88,7 +89,7 @@ static uint8_t _empDsAddr[1] = {1};
 #define DS_ADDR_MODE _empDsAddr
 
 // ====================== CLASS ======================
-template <uint8_t DS_PIN, uint8_t *DS_ADDR = nullptr>
+template <uint8_t DS_PIN, uint8_t *DS_ADDR = (uint8_t*)nullptr>
 class MicroDS18B20 {
 public:
     MicroDS18B20() {

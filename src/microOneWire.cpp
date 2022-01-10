@@ -15,10 +15,10 @@ bool oneWire_reset(uint8_t pin) {
     MOW_CLI();
     pinMode(pin, 0);
     delayMicroseconds(2);
-    for (uint8_t c = 80; c; c--) {
+    for (uint8_t c = 255; c; c--) {
         if (!digitalRead(pin)) {
             MOW_SEI();
-            for (uint8_t i = 200; !digitalRead(pin) && i; i--) delayMicroseconds(1);            
+            for (uint8_t i = 255; !digitalRead(pin) && i; i--) delayMicroseconds(1);            
             return false;
         }
         delayMicroseconds(1);
