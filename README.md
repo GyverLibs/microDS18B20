@@ -1,5 +1,7 @@
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![author](https://img.shields.io/badge/author-AlexGyver-informational.svg)
+![](https://img.shields.io/badge/License-MIT-green.svg)
+[![Foo](https://img.shields.io/badge/Website-AlexGyver.ru-blue.svg)](https://alexgyver.ru/)
+[![Foo](https://img.shields.io/badge/%E2%82%BD$%E2%82%AC%20%D0%9D%D0%B0%20%D0%BF%D0%B8%D0%B2%D0%BE-%D1%81%20%D1%80%D1%8B%D0%B1%D0%BA%D0%BE%D0%B9-red.svg)](https://alexgyver.ru/support_alex/)
+[![Foo](https://img.shields.io/youtube/channel/subscribers/UCgtAOyEQdAyjvm9ATCi_Aig?style=social)](https://www.youtube.com/channel/UCgtAOyEQdAyjvm9ATCi_Aig)
 # microDS18B20
 Легкая и простая библиотека для работы с 1-Wire (OneWire) термометрами Dallas DS18B20
 - Работа с несколькими датчиками на одном пине (режим адресации)
