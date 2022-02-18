@@ -1,16 +1,17 @@
 /*
-    Легкая и простая в обращении библиотека для работы с 1-Wire термометрами DS18B20
+    Легкая библиотека для работы с 1-Wire (OneWire) термометрами Dallas DS18B20
     Документация:
     GitHub: https://github.com/GyverLibs/microDS18B20
     Возможности:
     - Работа с несколькими датчиками на одном пине (режим адресации)
+    - Хранение массива адресов в PROGMEM памяти
     - Работа с одним датчиком на пине (без использования адресации)
     - Расчет температуры в целых числах и с плавающей точкой
+    - Чтение сырых данных для случаев сильной экономии памяти
     - Проверка корректности полученной температуры
     - Настраиваемое разрешение преобразования
-    - Чтение сырых данных для случаев сильной экономии памяти
-    - Проверка подлинности данных "на лету", с использованием CRC8 от Dallas
-    - Расчет CRC8 (~6 мкс) или чтение из таблицы (<1 мкс + 256 байт flash)
+    - Проверка подлинности данных
+    - Проверка корректности работы датчика
     
     Egor 'Nich1con' Zakharov & AlexGyver, alex@alexgyver.ru
     https://alexgyver.ru/
@@ -27,6 +28,7 @@
     v3.6 - исправлена ошибка компиляции, добавлена поддержка GyverCore (спасибо ArtemiyKolobov)
     v3.7 - исправлена ошибка readTemp() при 0 градусов
     v3.8 - небольшая оптимизация. Совместимость с ESP32
+    v3.9 - добавил расширенный режим адресации и хранение адресов в PROGMEM
 */
 
 #ifndef _microDS18B20_h
@@ -34,6 +36,8 @@
 #include <Arduino.h>
 #include "microOneWire.h"
 #include "DS_raw.h"
+
+#define DS_PROGMEM 1
 
 #ifndef DS_CHECK_CRC
 #define DS_CHECK_CRC true		  // true/false - проверка контрольной суммы принятых данных - надежнее, но тратит немного больше flash
@@ -89,12 +93,12 @@ static const uint8_t PROGMEM _ds_crc8_table[] = {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static uint8_t _empDsAddr[1] = {1};
+uint8_t _empDsAddr[1] = {1};
 #pragma GCC diagnostic pop
 #define DS_ADDR_MODE _empDsAddr
 
 // ====================== CLASS ======================
-template <uint8_t DS_PIN, uint8_t *DS_ADDR = (uint8_t*)nullptr>
+template <uint8_t DS_PIN, uint8_t *DS_ADDR = (uint8_t*)nullptr, uint8_t DS_AM = 1, bool DS_PGM = 0>
 class MicroDS18B20 {
 public:
     MicroDS18B20() {
@@ -103,13 +107,18 @@ public:
     }
 
     // Установить разрешение термометра 9-12 бит
-    void setResolution(uint8_t res) {
+    void setResolution(uint8_t res, uint8_t idx = 0) {
         if (!oneWire_reset(DS_PIN)) return;         // Проверка присутствия
-        addressRoutine();                           // Процедура адресации
+        addressRoutine(idx);                        // Процедура адресации
         oneWire_write(0x4E, DS_PIN);                // Запись RAM
         oneWire_write(0xFF, DS_PIN);                // Максимум в верхний регистр тревоги
         oneWire_write(0x00, DS_PIN);                // Минимум в верхний регистр тревоги
         oneWire_write(((constrain(res, 9, 12) - 9) << 5) | 0x1F, DS_PIN); // Запись конфигурации разрешения
+    }
+    
+    // Установить разрешение термометра 9-12 бит у всех датчиков на линии
+    void setResolutionAll(uint8_t res) {
+        for (int i = 0; i < DS_AM; i++) setResolution(res, i);
     }
     
     // установить адрес
@@ -134,36 +143,41 @@ public:
     }
     
     // запрос температуры
-    void requestTemp() {
-        state = 0;                                  // запрошена новая температура
+    void requestTemp(uint8_t idx = 0) {
+        state[idx] = 0;                             // запрошена новая температура
         if (!oneWire_reset(DS_PIN)) return;         // Проверка присутствия
-        addressRoutine();                           // Процедура адресации
+        addressRoutine(idx);                        // Процедура адресации
         oneWire_write(0x44, DS_PIN);                // Запросить преобразование
     }
     
+    // запрос температуры у всех датчиков на линии
+    void requestTempAll() {
+        for (int i = 0; i < DS_AM; i++) requestTemp(i);
+    }
+    
     // получить температуру float
-    float getTemp() {
-        if (!state) readTemp();
-        return (_buf / 16.0);
+    float getTemp(uint8_t idx = 0) {
+        if (!state[idx]) readTemp(idx);
+        return (_buf[idx] / 16.0);
     }
     
     // получить температуру int
-    int16_t getTempInt() {
-        if (!state) readTemp();
-        return (_buf >> 4);
+    int16_t getTempInt(uint8_t idx = 0) {
+        if (!state[idx]) readTemp(idx);
+        return (_buf[idx] >> 4);
     }
     
     // получить "сырое" значение температуры
-    int16_t getRaw() {
-        if (!state) readTemp();
-        return _buf;
+    int16_t getRaw(uint8_t idx = 0) {
+        if (!state[idx]) readTemp(idx);
+        return _buf[idx];
     }
     
     // прочитать температуру с датчика. true если успешно
-    bool readTemp() {
-        state = 1;
+    bool readTemp(uint8_t idx = 0) {
+        state[idx] = 1;
         if (!oneWire_reset(DS_PIN)) return 0;       // датчик оффлайн
-        addressRoutine();                   		// Процедура адресации
+        addressRoutine(idx);                   		// Процедура адресации
         oneWire_write(0xBE, DS_PIN);                // Запросить температуру
         uint8_t crc = 0;                            // обнуляем crc
         int16_t temp;                               // переменная для расчёта температуры
@@ -178,15 +192,15 @@ public:
             else if (i == 1) temp |= (data << 8);
         }
         if (sum == 0x8F7 || !sum || crc) return 0;  // датчик оффлайн или данные повреждены        
-        if (temp != 0x0550) _buf = temp;            // пропускаем первое чтение (85 градусов)
+        if (temp != 0x0550) _buf[idx] = temp;       // пропускаем первое чтение (85 градусов)
         return 1;
     }
 
     // проверить связь с датчиком (true - датчик на линии). ЛИНИЯ ДОЛЖНА БЫТЬ ПОДТЯНУТА
-    bool online() {
-        if (DS_ADDR) {
+    bool online(uint8_t idx = 0) {
+        if (DS_ADDR != nullptr) {
             if (!oneWire_reset(DS_PIN)) return 0;
-            addressRoutine();
+            addressRoutine(idx);
             oneWire_write(0xBE, DS_PIN);
             uint16_t sum = 0;
             for (uint8_t i = 0; i < 5; i++) sum += oneWire_read(DS_PIN);
@@ -195,14 +209,17 @@ public:
     }
 
 private:
-    bool state = 0;
+    bool state[DS_AM];
+    int16_t _buf[DS_AM];
     uint8_t *_addr = DS_ADDR;
-    int16_t _buf = 0;
     
-    void addressRoutine() {                   	    // Процедура адресации
-        if (DS_ADDR) {                        		// Адрес определен?
+    void addressRoutine(uint8_t idx) {              // Процедура адресации
+        if (DS_ADDR != nullptr) {                   // Адрес определен?
             oneWire_write(0x55, DS_PIN);            // Говорим термометрам слушать адрес
-            for (uint8_t i = 0; i < 8; i++) oneWire_write(_addr[i], DS_PIN);    // Отправляем адрес
+            for (uint8_t i = 0; i < 8; i++) {
+                if (DS_PGM) oneWire_write(pgm_read_byte(&_addr[i + idx * 8]), DS_PIN);
+                else oneWire_write(_addr[i + idx * 8], DS_PIN);
+            }
         } else oneWire_write(0xCC, DS_PIN);         // Адреса нет - пропускаем адресацию на линии
     }
 
