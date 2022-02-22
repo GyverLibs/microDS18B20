@@ -11,16 +11,11 @@ bool oneWire_reset(uint8_t pin) {
     pinMode(pin, OUTPUT);
     delayMicroseconds(600);
     pinMode(pin, INPUT);
-    delayMicroseconds(60);
-    bool pulse = 1;
     MOW_CLI();
-    for (uint8_t i = 220; i; i--) {
-        delayMicroseconds(2);
-        if (pulse && !digitalRead(pin)) {
-            pulse = 0;
-            MOW_SEI();
-        }
-    }
+    delayMicroseconds(60);
+    bool pulse = digitalRead(pin);
+    MOW_SEI();
+    delayMicroseconds(600);
     return !pulse;
 }
 
