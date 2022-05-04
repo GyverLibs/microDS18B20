@@ -1,3 +1,5 @@
+This is an automatic translation, may be incorrect in some places. See sources and examples!
+
 #microDS18B20
 Lightweight library for working with 1-Wire (OneWire) Dallas DS18B20 thermometers
 - Work with several sensors on one pin (addressing mode)
