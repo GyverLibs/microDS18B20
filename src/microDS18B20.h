@@ -98,6 +98,12 @@ uint8_t _empDsAddr[1] = {1};
 #pragma GCC diagnostic pop
 #define DS_ADDR_MODE _empDsAddr
 
+// Device resolution
+#define TEMP_9_BIT  0x1F //  9 bit
+#define TEMP_10_BIT 0x3F // 10 bit
+#define TEMP_11_BIT 0x5F // 11 bit
+#define TEMP_12_BIT 0x7F // 12 bit
+
 // ====================== CLASS ======================
 template <uint8_t DS_PIN, uint8_t *DS_ADDR = (uint8_t*)nullptr, uint8_t DS_AM = 1, bool DS_PGM = 0>
 class MicroDS18B20 {
@@ -107,6 +113,51 @@ public:
         digitalWrite(DS_PIN, LOW);
     }
 
+    // Read sensor resolution
+    bool readResolution(uint8_t idx = 0) {
+        state[idx] = 0;
+        if (!oneWire_reset(DS_PIN)) return 0;       // датчик оффлайн
+        addressRoutine(idx);                   		// Процедура адресации
+        oneWire_write(0xBE, DS_PIN);                // Read from RAM
+        
+		uint8_t crc = 0;                            // обнуляем crc
+        uint8_t res = 0;                           // variable for resolution
+        uint16_t sum = 0;                           // контрольная сумма
+        for (uint8_t i = 0; i < 9; i++) {           // Считать RAM
+            uint8_t data = oneWire_read(DS_PIN);    // Прочитать данные
+            sum += data;
+            #if (DS_CHECK_CRC == true)
+            _ds_crc8_upd(crc, data);                // Обновить значение CRC8
+            #endif
+            if (i == 4) res = data;            
+        }  
+		if (res != 0x00) _res[idx] = res;       	// reading resolution
+		return 1;
+    }
+
+    // get resolution
+    uint8_t getResolution(uint8_t idx = 0) {
+        if (!state[idx]) {
+		readResolution(idx);
+		switch (_res[idx]) {
+			case TEMP_12_BIT:
+				return 12;
+			case TEMP_11_BIT:
+				return 11;
+			case TEMP_10_BIT:
+				return 10;
+			case TEMP_9_BIT:
+				return 9;
+			}
+		}		
+		return 0;
+    }
+
+    // Get resolution from all sensors on wire
+    void getResolutionAll() {
+        for (int i = 0; i < DS_AM; i++) readResolution(i);
+    }
+    
     // Установить разрешение термометра 9-12 бит
     void setResolution(uint8_t res, uint8_t idx = 0) {
         if (!oneWire_reset(DS_PIN)) return;         // Проверка присутствия
@@ -213,6 +264,7 @@ private:
     bool state[DS_AM];
     int16_t _buf[DS_AM];
     uint8_t *_addr = DS_ADDR;
+    uint8_t _res[DS_AM];
     
     void addressRoutine(uint8_t idx) {              // Процедура адресации
         if (DS_ADDR != nullptr) {                   // Адрес определен?
