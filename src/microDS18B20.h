@@ -114,9 +114,20 @@ public:
         digitalWrite(DS_PIN, LOW);
     }
 
+    // запрос разрешенa
+    void requestResolution(uint8_t idx = 0) {
+        state[idx] = 0;                             // запрошена новая температура
+        if (!oneWire_reset(DS_PIN)) return;         // Проверка присутствия    
+    }
+
+    // запрос разрешенa у всех датчиков на линии
+    void requestResolutionAll() {
+        for (int i = 0; i < DS_AM; i++) requestResolution(i);
+    }
+    
     // Read sensor resolution
     bool readResolution(uint8_t idx = 0) {
-        state[idx] = 0;
+        state[idx] = 1;
         if (!oneWire_reset(DS_PIN)) return 0;       // датчик оффлайн
         addressRoutine(idx);                        // Процедура адресации
         oneWire_write(0xBE, DS_PIN);                // Read from RAM        
