@@ -5,9 +5,17 @@ MicroDS18B20 <2> sensor;  // Создаем термометр без адрес
 
 void setup() {
   Serial.begin(9600);
-  uint8_t res = sensor.getResolution();  // Чтение разрешенa датчикa
-  Serial.print("Resolution: ");
-  Serial.println(res);  
+  
+  // read sensor resolution
+  sensor.requestResolution();  
+  Serial.print("Sensor resolution: ");
+  Serial.print(sensor.getResolution());
+  
+  // read temperature
+  sensor.requestTemp();
+  delay(1000);
+  Serial.print(",  Temp: ");
+  Serial.println(sensor.getTemp());  
 }
 
 void loop() {
