@@ -118,40 +118,33 @@ public:
     bool readResolution(uint8_t idx = 0) {
         state[idx] = 0;
         if (!oneWire_reset(DS_PIN)) return 0;       // датчик оффлайн
-        addressRoutine(idx);                   		// Процедура адресации
-        oneWire_write(0xBE, DS_PIN);                // Read from RAM
-        
-		uint8_t crc = 0;                            // обнуляем crc
-        uint8_t res = 0;                           // variable for resolution
-        uint16_t sum = 0;                           // контрольная сумма
+        addressRoutine(idx);                        // Процедура адресации
+        oneWire_write(0xBE, DS_PIN);                // Read from RAM        
+        uint8_t res = 0;                            // variable for resolution
         for (uint8_t i = 0; i < 9; i++) {           // Считать RAM
             uint8_t data = oneWire_read(DS_PIN);    // Прочитать данные
-            sum += data;
-            #if (DS_CHECK_CRC == true)
-            _ds_crc8_upd(crc, data);                // Обновить значение CRC8
-            #endif
-            if (i == 4) res = data;            
-        }  
-		if (res != 0x00) _res[idx] = res;       	// reading resolution
-		return 1;
+            if (i == 4) res = data;
+        }
+        if (res != 0x00) _res[idx] = res;           // reading resolution
+        return 1;
     }
 
     // get resolution
     uint8_t getResolution(uint8_t idx = 0) {
         if (!state[idx]) {
-		readResolution(idx);
-		switch (_res[idx]) {
-			case TEMP_12_BIT:
-				return 12;
-			case TEMP_11_BIT:
-				return 11;
-			case TEMP_10_BIT:
-				return 10;
-			case TEMP_9_BIT:
-				return 9;
-			}
-		}		
-		return 0;
+            readResolution(idx);
+            switch (_res[idx]) {
+                case TEMP_12_BIT:
+                    return 12;
+                case TEMP_11_BIT:
+                    return 11;
+                case TEMP_10_BIT:
+                    return 10;
+                case TEMP_9_BIT:
+                    return 9;
+            }
+        }
+        return 0;
     }
 
     // Get resolution from all sensors on wire
