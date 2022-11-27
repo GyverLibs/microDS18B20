@@ -90,6 +90,9 @@ int16_t getRaw();                           // получить "сырое" з�
 void setResolutionAll(uint8_t res);                     // Установить разрешение 9-12 бит у всех датчиков на линии
 void setResolution(uint8_t resolution, uint8_t idx);    // Установить разрешение 9-12 бит (датчик под номером idx)
 bool online(uint8_t idx);                               // проверить связь (датчик под номером idx)
+
+void requestResolution(uint8_t idx = 0)
+void requestResolutionAll()
 uint8_t getResolution(uint8_t idx = 0)                  // прочитать разрешение датчикa (датчик под номером idx)
 void getResolutionAll()                                 // прочитать разрешение у всех датчиков на линии
 
@@ -357,6 +360,8 @@ MicroDS18B20 <2> sensor;  // Создаем термометр без адрес
 
 void setup() {
   Serial.begin(9600);
+  
+  sensor.requestResolution();
   uint8_t res = sensor.getResolution();  // Чтение разрешенa датчикa
   Serial.print("Resolution: ");
   Serial.println(res);  
