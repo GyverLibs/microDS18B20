@@ -80,6 +80,8 @@ int16_t getRaw(); // get "raw" temperature value (16 times more than real temper
 void setResolutionAll(uint8_tres); // Set the resolution to 9-12 bits for all sensors on the line
 void setResolution(uint8_t resolution, uint8_t idx); // Set resolution 9-12 bits (sensor idx)
 bool online(uint8_t idx); // check connection (sensor idx)
+uint8_t getResolution(uint8_t idx = 0)                  // read resolution from sensor (sensor idx)
+void getResolutionAll()                                 // read resolution from all sensor on line
 
 void requestTempAll(); // temperature request from all sensors on the line
 void requestTemp(uint8_t idx); // Request a new temperature conversion (sensor idx)
@@ -336,6 +338,24 @@ void loop() {
 }
 ```
 
+## Reading resolution of sensor
+```cpp
+#include <microDS18B20.h>
+
+// only one sensor on line!
+MicroDS18B20 <2> sensor;  // sensor on line 2 without address
+
+void setup() {
+  Serial.begin(9600);
+  uint8_t res = sensor.getResolution();  // reading resolution
+  Serial.print("Resolution: ");
+  Serial.println(res);  
+}
+
+void loop() {
+}
+```
+
 <a id="versions"></a>
 ## Versions
 - v3.0 - Library moved to template! The old examples are NOT COMPATIBLE. Optimization, new tricks.
@@ -351,6 +371,7 @@ void loop() {
 - v3.8 - small optimization. Compatible with ESP32
 - v3.9 - added extended addressing mode and storage of addresses in PROGMEM
 - v3.10 - optimization, increased stability
+- v3.10.1 - added getResolution()
 
 <a id="feedback"></a>
 ## Bugs and feedback
