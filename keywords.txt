@@ -11,6 +11,9 @@ microDS18B20	KEYWORD1
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
+getResolution	KEYWORD2
+getResolutionAll	KEYWORD2
+
 setResolution	KEYWORD2
 readAddress	KEYWORD2
 setAddress	KEYWORD2

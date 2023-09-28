@@ -93,6 +93,11 @@ void setResolutionAll(uint8_t res);                     // Установить 
 void setResolution(uint8_t resolution, uint8_t idx);    // Установить разрешение 9-12 бит (датчик под номером idx)
 bool online(uint8_t idx);                               // проверить связь (датчик под номером idx)
 
+void requestResolution(uint8_t idx = 0)
+void requestResolutionAll()
+uint8_t getResolution(uint8_t idx = 0)                  // прочитать разрешение датчикa (датчик под номером idx)
+void getResolutionAll()                                 // прочитать разрешение у всех датчиков на линии
+
 void requestTempAll();                                  // запрос температуры у всех датчиков на линии
 void requestTemp(uint8_t idx);                          // Запросить новое преобразование температуры (датчик под номером idx)
 bool readTemp(uint8_t idx);                             // прочитать температуру с датчика (датчик под номером idx)
@@ -348,6 +353,32 @@ void loop() {
 }
 ```
 
+## Чтение разрешенa датчикa
+```cpp
+#include <microDS18B20.h>
+
+// на пин подключен только один датчик!
+MicroDS18B20 <2> sensor;  // Создаем термометр без адреса на пине 2
+
+void setup() {
+  Serial.begin(9600);
+  
+  // read sensor resolution
+  sensor.requestResolution();  
+  Serial.print("Sensor resolution: ");
+  Serial.print(sensor.getResolution());
+  
+  // read temperature
+  sensor.requestTemp();
+  delay(1000);
+  Serial.print(",  Temp: ");
+  Serial.println(sensor.getTemp());  
+}
+
+void loop() {
+}
+```
+
 <a id="versions"></a>
 ## Версии
 - v3.0 - Библиотека переехала на шаблон! Старые примеры НЕСОВМЕСТИМЫ. Оптимизация, новые трюки.
@@ -363,6 +394,7 @@ void loop() {
 - v3.8 - небольшая оптимизация. Совместимость с ESP32
 - v3.9 - добавил расширенный режим адресации и хранение адресов в PROGMEM
 - v3.10 - оптимизация, увеличена стабильность
+- v3.10.1 - added getResolution()
 
 <a id="feedback"></a>
 ## Баги и обратная связь
