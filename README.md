@@ -1,3 +1,6 @@
+|⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️<br><br>**ВНИМАНИЕ, БИБЛИОТЕКА УСТАРЕЛА! ИСПОЛЬЗУЙ БИБЛИОТЕКУ [GyverDS18](https://github.com/GyverLibs/GyverDS18), ОНА ИМЕЕТ БОЛЬШЕ ВОЗМОЖНОСТЕЙ И РАБОТАЕТ НА ESP32**<br><br>⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️|
+| --- |
+
 [![latest](https://img.shields.io/github/v/release/GyverLibs/microDS18B20.svg?color=brightgreen)](https://github.com/GyverLibs/microDS18B20/releases/latest/download/microDS18B20.zip)
 [![PIO](https://badges.registry.platformio.org/packages/gyverlibs/library/microDS18B20.svg)](https://registry.platformio.org/libraries/gyverlibs/microDS18B20)
 [![arduino-library](https://www.ardu-badge.com/badge/microDS18B20.svg?)](https://www.ardu-badge.com/microDS18B20)
